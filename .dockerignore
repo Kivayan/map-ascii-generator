@@ -1,0 +1,6 @@
+.git
+.gitignore
+node_modules
+web/node_modules
+web/.astro
+web/dist

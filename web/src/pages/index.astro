@@ -1,0 +1,673 @@
+---
+const colorOptions = [
+  "black",
+  "red",
+  "green",
+  "yellow",
+  "blue",
+  "magenta",
+  "cyan",
+  "white",
+  "bright-black",
+  "bright-red",
+  "bright-green",
+  "bright-yellow",
+  "bright-blue",
+  "bright-magenta",
+  "bright-cyan",
+  "bright-white"
+];
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ASCII World Map Generator</title>
+    <style>
+      :root {
+        --bg-a: #0b1020;
+        --bg-b: #172a3f;
+        --panel: rgba(10, 18, 31, 0.78);
+        --panel-border: rgba(145, 178, 212, 0.28);
+        --text: #eaf5ff;
+        --muted: #acc4db;
+        --accent: #ffb65c;
+        --accent-soft: rgba(255, 182, 92, 0.2);
+        --danger: #ff8a8a;
+
+        --ansi-black: #3f495a;
+        --ansi-red: #f06d74;
+        --ansi-green: #94d17a;
+        --ansi-yellow: #f4d980;
+        --ansi-blue: #76a9fa;
+        --ansi-magenta: #dc8fff;
+        --ansi-cyan: #6ed9de;
+        --ansi-white: #f7fbff;
+        --ansi-bright-black: #79879f;
+        --ansi-bright-red: #ff95a3;
+        --ansi-bright-green: #b8f29b;
+        --ansi-bright-yellow: #ffecab;
+        --ansi-bright-blue: #a7c8ff;
+        --ansi-bright-magenta: #efb8ff;
+        --ansi-bright-cyan: #a2f1f5;
+        --ansi-bright-white: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 15% 10%, rgba(255, 182, 92, 0.18), transparent 35%),
+          radial-gradient(circle at 85% 90%, rgba(110, 217, 222, 0.2), transparent 42%),
+          linear-gradient(130deg, var(--bg-a), var(--bg-b));
+      }
+
+      .shell {
+        width: min(1320px, calc(100vw - 2rem));
+        margin: 1.25rem auto 2rem;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 18px;
+        backdrop-filter: blur(6px);
+        box-shadow: 0 16px 34px rgba(6, 12, 20, 0.38);
+      }
+
+      .controls {
+        padding: 1rem;
+      }
+
+      #generator-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+        gap: 0.75rem;
+        align-items: start;
+      }
+
+      h1 {
+        margin: 0 0 0.45rem;
+        font-size: clamp(1.35rem, 2.8vw, 1.95rem);
+        letter-spacing: 0.02em;
+      }
+
+      .sub {
+        margin: 0 0 1rem;
+        color: var(--muted);
+        line-height: 1.35;
+      }
+
+      fieldset {
+        margin: 0;
+        border: 1px solid rgba(133, 168, 201, 0.22);
+        border-radius: 12px;
+        padding: 0.8rem;
+      }
+
+      legend {
+        font-size: 0.84rem;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        padding: 0 0.35rem;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem;
+        margin-bottom: 0.55rem;
+      }
+
+      .row:last-child {
+        margin-bottom: 0;
+      }
+
+      label {
+        display: grid;
+        gap: 0.28rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      input,
+      select,
+      button {
+        font: inherit;
+      }
+
+      input,
+      select {
+        width: 100%;
+        border: 1px solid rgba(133, 168, 201, 0.35);
+        border-radius: 10px;
+        background: rgba(12, 22, 37, 0.75);
+        color: var(--text);
+        padding: 0.5rem 0.6rem;
+      }
+
+      input[type="checkbox"] {
+        width: auto;
+      }
+
+      .checkbox {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        grid-column: 1 / -1;
+      }
+
+      .actions button {
+        min-width: 120px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 10px;
+        padding: 0.62rem 0.95rem;
+        background: rgba(15, 30, 51, 0.9);
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      .generate {
+        background: linear-gradient(140deg, #ffb65c, #f88d5f);
+        color: #212025;
+        font-weight: 700;
+      }
+
+      .generate:disabled {
+        opacity: 0.6;
+        cursor: wait;
+      }
+
+      .status {
+        margin-top: 0.75rem;
+        min-height: 1.2rem;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      .status.error {
+        color: var(--danger);
+      }
+
+      .result {
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+
+      .result-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.8rem;
+        padding: 0.95rem 1rem;
+        border-bottom: 1px solid rgba(133, 168, 201, 0.22);
+      }
+
+      .view-toggle {
+        display: inline-flex;
+        border: 1px solid rgba(133, 168, 201, 0.3);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      .view-toggle button {
+        border-radius: 0;
+        background: transparent;
+        color: var(--muted);
+        padding: 0.42rem 0.85rem;
+      }
+
+      .view-toggle button.active {
+        background: var(--accent-soft);
+        color: var(--text);
+      }
+
+      .meta {
+        color: var(--muted);
+        font-size: 0.84rem;
+      }
+
+      .dirty {
+        margin-left: auto;
+        color: var(--accent);
+        font-size: 0.8rem;
+        opacity: 0;
+        transition: opacity 120ms ease;
+      }
+
+      .dirty.visible {
+        opacity: 1;
+      }
+
+      .output-wrap {
+        padding: 1rem;
+        overflow: auto;
+        max-height: calc(100vh - 275px);
+      }
+
+      pre {
+        margin: 0;
+        display: inline-block;
+        width: max-content;
+        min-width: 100%;
+        border-radius: 12px;
+        padding: 1rem;
+        background: rgba(5, 10, 18, 0.92);
+        border: 1px solid rgba(133, 168, 201, 0.2);
+        font-family: "JetBrains Mono", "IBM Plex Mono", "Fira Code", monospace;
+        font-size: 0.82rem;
+        line-height: 1;
+        white-space: pre;
+      }
+
+      @media (max-width: 1000px) {
+        #generator-form {
+          grid-template-columns: 1fr;
+        }
+
+        .output-wrap {
+          max-height: calc(100vh - 240px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="panel controls">
+        <h1>ASCII World Map Generator</h1>
+        <p class="sub">Generate plain text and ANSI-colored world maps from one request. Rendering is triggered only when you click Generate.</p>
+
+        <form id="generator-form">
+          <fieldset>
+            <legend>Map</legend>
+            <div class="row">
+              <label>
+                Width
+                <input id="width" type="number" min="20" max="240" step="1" value="120" />
+              </label>
+              <label>
+                Supersample
+                <input id="supersample" type="number" min="1" max="5" step="1" value="3" />
+              </label>
+            </div>
+            <div class="row">
+              <label>
+                Char Aspect
+                <input id="char-aspect" type="number" min="1" max="3.5" step="0.1" value="2" />
+              </label>
+              <label>
+                Vertical Margin
+                <input id="margin" type="number" min="0" max="12" step="1" value="2" />
+              </label>
+            </div>
+            <div class="checkbox">
+              <input id="frame" type="checkbox" checked />
+              <label for="frame">Frame</label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Marker</legend>
+            <div class="checkbox" style="margin-bottom: 0.6rem;">
+              <input id="marker-enabled" type="checkbox" />
+              <label for="marker-enabled">Enable marker</label>
+            </div>
+            <div class="row">
+              <label>
+                Longitude
+                <input id="marker-lon" type="number" min="-180" max="180" step="0.0001" value="0" />
+              </label>
+              <label>
+                Latitude
+                <input id="marker-lat" type="number" min="-90" max="90" step="0.0001" value="0" />
+              </label>
+            </div>
+            <div class="row">
+              <label>
+                Center Char
+                <input id="marker-center" type="text" maxlength="1" value="O" />
+              </label>
+              <label>
+                Horizontal Char
+                <input id="marker-horizontal" type="text" maxlength="1" value="-" />
+              </label>
+            </div>
+            <div class="row">
+              <label>
+                Vertical Char
+                <input id="marker-vertical" type="text" maxlength="1" value="|" />
+              </label>
+              <label>
+                Arm X / Arm Y (-1 = full)
+                <input id="marker-arms" type="text" value="-1,-1" />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Color</legend>
+            <div class="row">
+              <label>
+                Color Mode
+                <select id="color-mode">
+                  <option value="never">never</option>
+                  <option value="always" selected>always</option>
+                </select>
+              </label>
+              <label>
+                Map Color
+                <select id="map-color">
+                  {colorOptions.map((name) => <option value={name} selected={name === "green"}>{name}</option>)}
+                </select>
+              </label>
+            </div>
+            <div class="row">
+              <label>
+                Frame Color
+                <select id="frame-color">
+                  {colorOptions.map((name) => <option value={name} selected={name === "bright-white"}>{name}</option>)}
+                </select>
+              </label>
+              <label>
+                Marker Color
+                <select id="marker-color">
+                  {colorOptions.map((name) => <option value={name} selected={name === "bright-red"}>{name}</option>)}
+                </select>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="actions">
+            <button class="generate" id="generate" type="submit">Generate</button>
+            <button id="copy" type="button">Copy</button>
+            <button id="download" type="button">Download</button>
+          </div>
+        </form>
+
+        <div id="status" class="status"></div>
+      </section>
+
+      <section class="panel result">
+        <header class="result-header">
+          <div class="view-toggle">
+            <button id="show-plain" type="button">Plain</button>
+            <button id="show-ansi" type="button" class="active">ANSI</button>
+          </div>
+          <div id="meta" class="meta">No map generated yet.</div>
+          <div id="dirty" class="dirty">Unsaved input changes</div>
+        </header>
+        <div class="output-wrap">
+          <pre id="output">Click Generate to render a map.</pre>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const form = document.getElementById("generator-form");
+      const generateButton = document.getElementById("generate");
+      const statusEl = document.getElementById("status");
+      const outputEl = document.getElementById("output");
+      const metaEl = document.getElementById("meta");
+      const dirtyEl = document.getElementById("dirty");
+
+      const showPlainButton = document.getElementById("show-plain");
+      const showANSIButton = document.getElementById("show-ansi");
+      const copyButton = document.getElementById("copy");
+      const downloadButton = document.getElementById("download");
+
+      const ansiCodeToColor = {
+        30: "var(--ansi-black)",
+        31: "var(--ansi-red)",
+        32: "var(--ansi-green)",
+        33: "var(--ansi-yellow)",
+        34: "var(--ansi-blue)",
+        35: "var(--ansi-magenta)",
+        36: "var(--ansi-cyan)",
+        37: "var(--ansi-white)",
+        90: "var(--ansi-bright-black)",
+        91: "var(--ansi-bright-red)",
+        92: "var(--ansi-bright-green)",
+        93: "var(--ansi-bright-yellow)",
+        94: "var(--ansi-bright-blue)",
+        95: "var(--ansi-bright-magenta)",
+        96: "var(--ansi-bright-cyan)",
+        97: "var(--ansi-bright-white)"
+      };
+
+      let currentView = "ansi";
+      let currentResult = null;
+      let isDirty = false;
+
+      function escapeHTML(value) {
+        return value
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;");
+      }
+
+      function ansiToHTML(source) {
+        const ansiRE = /\x1b\[([0-9;]*)m/g;
+        let html = "";
+        let cursor = 0;
+        let spanOpen = false;
+        let match;
+
+        while ((match = ansiRE.exec(source)) !== null) {
+          html += escapeHTML(source.slice(cursor, match.index));
+          cursor = ansiRE.lastIndex;
+
+          const codes = match[1]
+            .split(";")
+            .filter(Boolean)
+            .map((value) => Number(value));
+
+          if (codes.length === 0 || codes.includes(0)) {
+            if (spanOpen) {
+              html += "</span>";
+              spanOpen = false;
+            }
+            continue;
+          }
+
+          for (const code of codes) {
+            const color = ansiCodeToColor[code];
+            if (!color) {
+              continue;
+            }
+            if (spanOpen) {
+              html += "</span>";
+            }
+            html += `<span style="color:${color}">`;
+            spanOpen = true;
+          }
+        }
+
+        html += escapeHTML(source.slice(cursor));
+        if (spanOpen) {
+          html += "</span>";
+        }
+
+        return html;
+      }
+
+      function updateDirtyState(nextValue) {
+        isDirty = nextValue;
+        dirtyEl.classList.toggle("visible", isDirty);
+      }
+
+      function updateStatus(text, isError = false) {
+        statusEl.textContent = text;
+        statusEl.classList.toggle("error", isError);
+      }
+
+      function setView(view) {
+        currentView = view;
+        showPlainButton.classList.toggle("active", view === "plain");
+        showANSIButton.classList.toggle("active", view === "ansi");
+
+        if (!currentResult) {
+          return;
+        }
+
+        if (view === "ansi") {
+          outputEl.innerHTML = ansiToHTML(currentResult.ansi);
+        } else {
+          outputEl.textContent = currentResult.plain;
+        }
+      }
+
+      function parseArmPair(value) {
+        const pair = String(value)
+          .split(",")
+          .map((v) => Number(v.trim()));
+
+        if (pair.length !== 2 || pair.some((v) => Number.isNaN(v))) {
+          return { armX: -1, armY: -1 };
+        }
+
+        return { armX: Math.trunc(pair[0]), armY: Math.trunc(pair[1]) };
+      }
+
+      function collectPayload() {
+        const arms = parseArmPair(document.getElementById("marker-arms").value);
+
+        return {
+          width: Number(document.getElementById("width").value),
+          supersample: Number(document.getElementById("supersample").value),
+          char_aspect: Number(document.getElementById("char-aspect").value),
+          margin: Number(document.getElementById("margin").value),
+          frame: document.getElementById("frame").checked,
+          marker: {
+            enabled: document.getElementById("marker-enabled").checked,
+            lon: Number(document.getElementById("marker-lon").value),
+            lat: Number(document.getElementById("marker-lat").value),
+            center: document.getElementById("marker-center").value,
+            horizontal: document.getElementById("marker-horizontal").value,
+            vertical: document.getElementById("marker-vertical").value,
+            arm_x: arms.armX,
+            arm_y: arms.armY
+          },
+          color: {
+            mode: document.getElementById("color-mode").value,
+            map_color: document.getElementById("map-color").value,
+            frame_color: document.getElementById("frame-color").value,
+            marker_color: document.getElementById("marker-color").value
+          }
+        };
+      }
+
+      async function generateMap() {
+        generateButton.disabled = true;
+        updateStatus("Generating map...");
+
+        try {
+          const payload = collectPayload();
+          const response = await fetch("/api/generate", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const body = await response.json();
+          if (!response.ok) {
+            throw new Error(body.error || "Request failed");
+          }
+
+          currentResult = body;
+          setView(currentView);
+
+          metaEl.textContent = `Width ${body.meta.width}, height ${body.meta.height}, supersample ${body.meta.supersample}, ${body.meta.duration_ms} ms.`;
+          updateStatus("Done.");
+          updateDirtyState(false);
+        } catch (error) {
+          updateStatus(String(error.message || error), true);
+        } finally {
+          generateButton.disabled = false;
+        }
+      }
+
+      function getCurrentExportValue() {
+        if (!currentResult) {
+          return "";
+        }
+
+        if (currentView === "ansi") {
+          return outputEl.textContent || currentResult.plain;
+        }
+
+        return currentResult.plain;
+      }
+
+      async function copyCurrentView() {
+        if (!currentResult) {
+          updateStatus("Generate a map first.", true);
+          return;
+        }
+
+        const value = getCurrentExportValue();
+        try {
+          await navigator.clipboard.writeText(value);
+          updateStatus("Output copied.");
+        } catch {
+          updateStatus("Clipboard write failed.", true);
+        }
+      }
+
+      function downloadCurrentView() {
+        if (!currentResult) {
+          updateStatus("Generate a map first.", true);
+          return;
+        }
+
+        const value = getCurrentExportValue();
+        const blob = new Blob([value], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = "map.txt";
+        document.body.append(anchor);
+        anchor.click();
+        anchor.remove();
+
+        URL.revokeObjectURL(url);
+        updateStatus("Output downloaded.");
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        generateMap();
+      });
+
+      form.addEventListener("input", () => {
+        updateDirtyState(true);
+      });
+
+      showPlainButton.addEventListener("click", () => setView("plain"));
+      showANSIButton.addEventListener("click", () => setView("ansi"));
+      copyButton.addEventListener("click", copyCurrentView);
+      downloadButton.addEventListener("click", downloadCurrentView);
+    </script>
+  </body>
+</html>

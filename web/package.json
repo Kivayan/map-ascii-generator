@@ -1,0 +1,14 @@
+{
+  "name": "ascii-world-map-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host 0.0.0.0 --port 4321",
+    "build": "astro build",
+    "preview": "astro preview --host 0.0.0.0 --port 4321"
+  },
+  "devDependencies": {
+    "astro": "^5.2.0"
+  }
+}
