@@ -1,4 +1,7 @@
 ---
+const umamiWebsiteId = import.meta.env.PUBLIC_UMAMI_WEBSITE_ID;
+const umamiHostUrl = import.meta.env.PUBLIC_UMAMI_HOST_URL || "https://kws.kivayan.com";
+
 const colorOptions = [
   "black",
   "red",
@@ -24,6 +27,13 @@ const colorOptions = [
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ASCII World Map Generator</title>
+    {umamiWebsiteId && (
+      <script
+        defer
+        src={`${umamiHostUrl}/script.js`}
+        data-website-id={umamiWebsiteId}
+      ></script>
+    )}
     <style>
       :root {
         --bg-a: #0b1020;

@@ -39,6 +39,20 @@ docker compose up --build
 
 Open `http://localhost:8080`.
 
+## Umami analytics
+
+This repo supports Umami tracking via public env vars (Astro build-time):
+
+- `PUBLIC_UMAMI_WEBSITE_ID`
+- `PUBLIC_UMAMI_HOST_URL` (default `https://kws.kivayan.com`)
+
+Copy and adjust env values, then rebuild so static assets include the script tag:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
 ## API example
 
 `POST /api/generate`

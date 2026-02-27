@@ -14,7 +14,21 @@ services:
     build:
       context: .
       dockerfile: web/Dockerfile
+      args:
+        PUBLIC_UMAMI_WEBSITE_ID: ${PUBLIC_UMAMI_WEBSITE_ID:-}
+        PUBLIC_UMAMI_HOST_URL: ${PUBLIC_UMAMI_HOST_URL:-https://kws.kivayan.com}
     depends_on:
       - api
-    ports:
-      - "8080:80"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=cloudflared_network
+      - traefik.http.routers.ascii-map.rule=Host(`ascii-map.kivayan.com`)
+      - traefik.http.routers.ascii-map.entrypoints=web
+      - traefik.http.services.ascii-map.loadbalancer.server.port=80
+    networks:
+      - default
+      - cloudflared_network
+
+networks:
+  cloudflared_network:
+    external: true
