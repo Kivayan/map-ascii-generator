@@ -304,7 +304,7 @@ const colorOptions = [
     <main class="shell">
       <section class="panel controls">
         <h1>ASCII World Map Generator</h1>
-        <p class="sub">Generate plain text and ANSI-colored world maps from one request. Rendering is triggered only when you click Generate.</p>
+        <p class="sub">Generate plain text and ANSI-colored world maps from one request. The page renders a map on load using the default settings.</p>
 
         <form id="generator-form">
           <fieldset>
@@ -422,11 +422,11 @@ const colorOptions = [
             <button id="show-plain" type="button">Plain</button>
             <button id="show-ansi" type="button" class="active">ANSI</button>
           </div>
-          <div id="meta" class="meta">No map generated yet.</div>
+          <div id="meta" class="meta">Generating initial map...</div>
           <div id="dirty" class="dirty">Unsaved input changes</div>
         </header>
         <div class="output-wrap">
-          <pre id="output">Click Generate to render a map.</pre>
+          <pre id="output">Generating initial map...</pre>
         </div>
       </section>
     </main>
@@ -678,6 +678,8 @@ const colorOptions = [
       showANSIButton.addEventListener("click", () => setView("ansi"));
       copyButton.addEventListener("click", copyCurrentView);
       downloadButton.addEventListener("click", downloadCurrentView);
+
+      generateMap();
     </script>
   </body>
 </html>
