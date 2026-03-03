@@ -12,13 +12,14 @@ Visit the page at [https://ascii-map.kivayan.com](https://ascii-map.kivayan.com)
 
 - Renders world maps as plain ASCII text.
 - Optionally renders ANSI-colored output in the same request.
-- Exposes map controls for width, supersample, char aspect, margin, frame, marker, and colors.
+- Exposes map controls for width, supersample, char aspect, margin, frame, continent scope, marker, and colors.
 - Provides copy/download actions from the UI.
 
 ## Architecture
 
 - `api/`: Go HTTP server
   - `POST /api/generate`
+  - `GET /api/options`
   - `GET /api/healthz`
 - `web/`: Astro static page + client-side JS
 - `deploy/Caddyfile`: static file serving and reverse proxy
@@ -27,9 +28,10 @@ Visit the page at [https://ascii-map.kivayan.com](https://ascii-map.kivayan.com)
 Request flow:
 
 1. Browser loads UI from `web` (Caddy).
-2. UI sends JSON to `/api/generate`.
-3. Caddy proxies `/api/*` to the Go API (`api:8081`).
-4. API validates input, renders map(s), and returns JSON.
+2. UI fetches dynamic options from `/api/options`.
+3. UI sends JSON to `/api/generate`.
+4. Caddy proxies `/api/*` to the Go API (`api:8081`).
+5. API validates input, renders map(s), and returns JSON.
 
 ## Run locally
 
@@ -64,6 +66,7 @@ docker compose up -d --build
   "char_aspect": 2,
   "margin": 2,
   "frame": true,
+  "continent": "europe",
   "marker": {
     "enabled": false,
     "lon": 0,
@@ -80,6 +83,26 @@ docker compose up -d --build
     "frame_color": "bright-white",
     "marker_color": "bright-red"
   }
+}
+```
+
+`continent` is optional. Omit it (or set empty string) to render the full world.
+
+`GET /api/options`
+
+Response shape:
+
+```json
+{
+  "continents": [
+    "africa",
+    "antarctica",
+    "asia",
+    "europe",
+    "north-america",
+    "south-america",
+    "oceania"
+  ]
 }
 ```
 

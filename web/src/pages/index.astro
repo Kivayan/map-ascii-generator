@@ -143,6 +143,10 @@ const colorOptions = [
         margin-bottom: 0;
       }
 
+      .row.single {
+        grid-template-columns: 1fr;
+      }
+
       label {
         display: grid;
         gap: 0.28rem;
@@ -329,6 +333,14 @@ const colorOptions = [
                 <input id="margin" type="number" min="0" max="12" step="1" value="2" />
               </label>
             </div>
+            <div class="row single">
+              <label>
+                Scope
+                <select id="continent">
+                  <option value="world" selected>world</option>
+                </select>
+              </label>
+            </div>
             <div class="checkbox">
               <input id="frame" type="checkbox" checked />
               <label for="frame">Frame</label>
@@ -443,6 +455,17 @@ const colorOptions = [
       const showANSIButton = document.getElementById("show-ansi");
       const copyButton = document.getElementById("copy");
       const downloadButton = document.getElementById("download");
+      const continentSelect = document.getElementById("continent");
+
+      const fallbackContinents = [
+        "africa",
+        "antarctica",
+        "asia",
+        "europe",
+        "north-america",
+        "south-america",
+        "oceania"
+      ];
 
       const ansiCodeToColor = {
         30: "var(--ansi-black)",
@@ -557,8 +580,59 @@ const colorOptions = [
         return { armX: Math.trunc(pair[0]), armY: Math.trunc(pair[1]) };
       }
 
+      function formatContinentLabel(value) {
+        return value
+          .split("-")
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" ");
+      }
+
+      function applyContinentOptions(continents) {
+        const previous = continentSelect.value || "world";
+        const valid = [];
+        const seen = new Set();
+
+        for (const continent of continents) {
+          const normalized = String(continent || "").trim().toLowerCase();
+          if (!normalized || seen.has(normalized)) {
+            continue;
+          }
+          seen.add(normalized);
+          valid.push(normalized);
+        }
+
+        continentSelect.innerHTML = "";
+        continentSelect.append(new Option("world", "world"));
+
+        for (const continent of valid) {
+          continentSelect.append(new Option(formatContinentLabel(continent), continent));
+        }
+
+        const next = seen.has(previous) || previous === "world" ? previous : "world";
+        continentSelect.value = next;
+      }
+
+      async function loadContinentOptions() {
+        try {
+          const response = await fetch("/api/options");
+          const body = await response.json();
+          if (!response.ok) {
+            throw new Error(body.error || "failed to load options");
+          }
+          if (!Array.isArray(body.continents)) {
+            throw new Error("invalid options payload");
+          }
+
+          applyContinentOptions(body.continents);
+        } catch {
+          applyContinentOptions(fallbackContinents);
+          updateStatus("Could not load options from API, using fallback list.", true);
+        }
+      }
+
       function collectPayload() {
         const arms = parseArmPair(document.getElementById("marker-arms").value);
+        const continent = continentSelect.value;
 
         return {
           width: Number(document.getElementById("width").value),
@@ -566,6 +640,7 @@ const colorOptions = [
           char_aspect: Number(document.getElementById("char-aspect").value),
           margin: Number(document.getElementById("margin").value),
           frame: document.getElementById("frame").checked,
+          continent: continent === "world" ? "" : continent,
           marker: {
             enabled: document.getElementById("marker-enabled").checked,
             lon: Number(document.getElementById("marker-lon").value),
@@ -607,7 +682,8 @@ const colorOptions = [
           currentResult = body;
           setView(currentView);
 
-          metaEl.textContent = `Width ${body.meta.width}, height ${body.meta.height}, supersample ${body.meta.supersample}, ${body.meta.duration_ms} ms.`;
+          const scope = body.meta.continent || "world";
+          metaEl.textContent = `Scope ${scope}, width ${body.meta.width}, height ${body.meta.height}, supersample ${body.meta.supersample}, ${body.meta.duration_ms} ms.`;
           updateStatus("Done.");
           updateDirtyState(false);
         } catch (error) {
@@ -679,7 +755,12 @@ const colorOptions = [
       copyButton.addEventListener("click", copyCurrentView);
       downloadButton.addEventListener("click", downloadCurrentView);
 
-      generateMap();
+      async function initialize() {
+        await loadContinentOptions();
+        generateMap();
+      }
+
+      initialize();
     </script>
   </body>
 </html>

@@ -88,6 +88,7 @@ type generateRequest struct {
 	CharAspect  float64 `json:"char_aspect"`
 	Margin      int     `json:"margin"`
 	Frame       bool    `json:"frame"`
+	Continent   string  `json:"continent"`
 	Marker      struct {
 		Enabled    bool    `json:"enabled"`
 		Lon        float64 `json:"lon"`
@@ -114,9 +115,14 @@ type generateResponse struct {
 		Height      int     `json:"height"`
 		Supersample int     `json:"supersample"`
 		CharAspect  float64 `json:"char_aspect"`
+		Continent   string  `json:"continent,omitempty"`
 		DurationMS  int64   `json:"duration_ms"`
 		Bytes       int     `json:"bytes"`
 	} `json:"meta"`
+}
+
+type optionsResponse struct {
+	Continents []string `json:"continents"`
 }
 
 type errorResponse struct {
@@ -139,6 +145,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/healthz", srv.handleHealth)
+	mux.HandleFunc("/api/options", srv.handleOptions)
 	mux.HandleFunc("/api/generate", srv.handleGenerate)
 
 	httpServer := &http.Server{
@@ -167,6 +174,15 @@ func (s *server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+func (s *server) handleOptions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, optionsResponse{Continents: mapascii.ContinentNames()})
+}
+
 func (s *server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -190,6 +206,12 @@ func (s *server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	viewport, continentName, err := requestViewport(req)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	marker, err := requestMarkerToModel(req)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, err.Error())
@@ -202,6 +224,7 @@ func (s *server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		VerticalMarginRows: req.Margin,
 		Frame:              req.Frame,
 		ColorMode:          "never",
+		Viewport:           viewport,
 	})
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("render plain output failed: %v", err))
@@ -217,6 +240,7 @@ func (s *server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 			MapColor:           req.Color.MapColor,
 			FrameColor:         req.Color.FrameColor,
 			MarkerColor:        req.Color.MarkerColor,
+			Viewport:           viewport,
 		})
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("render ansi output failed: %v", err))
@@ -225,7 +249,13 @@ func (s *server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	duration := time.Since(start)
-	height := int(math.Round(float64(req.Width) / (2.0 * req.CharAspect)))
+	lonSpan := 360.0
+	latSpan := 180.0
+	if viewport != nil {
+		lonSpan = viewport.MaxLon - viewport.MinLon
+		latSpan = viewport.MaxLat - viewport.MinLat
+	}
+	height := int(math.Round((float64(req.Width) * latSpan / lonSpan) / req.CharAspect))
 
 	resp := generateResponse{
 		Plain: plain,
@@ -235,6 +265,7 @@ func (s *server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	resp.Meta.Height = height
 	resp.Meta.Supersample = req.Supersample
 	resp.Meta.CharAspect = req.CharAspect
+	resp.Meta.Continent = continentName
 	resp.Meta.DurationMS = duration.Milliseconds()
 	resp.Meta.Bytes = len(plain)
 
@@ -242,6 +273,11 @@ func (s *server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) validateRequest(req generateRequest) error {
+	viewport, _, err := requestViewport(req)
+	if err != nil {
+		return err
+	}
+
 	if req.Width < s.cfg.minWidth || req.Width > s.cfg.maxWidth {
 		return fmt.Errorf("width must be between %d and %d", s.cfg.minWidth, s.cfg.maxWidth)
 	}
@@ -281,6 +317,11 @@ func (s *server) validateRequest(req generateRequest) error {
 		if !isFinite(req.Marker.Lat) || req.Marker.Lat < -90.0 || req.Marker.Lat > 90.0 {
 			return fmt.Errorf("marker.lat must be between -90 and 90")
 		}
+		if viewport != nil {
+			if req.Marker.Lon < viewport.MinLon || req.Marker.Lon > viewport.MaxLon || req.Marker.Lat < viewport.MinLat || req.Marker.Lat > viewport.MaxLat {
+				return fmt.Errorf("marker coordinates must be inside the selected continent viewport")
+			}
+		}
 		if req.Marker.ArmX < -1 || req.Marker.ArmY < -1 {
 			return fmt.Errorf("marker arm lengths must be -1 or greater")
 		}
@@ -297,6 +338,25 @@ func (s *server) validateRequest(req generateRequest) error {
 	}
 
 	return nil
+}
+
+func requestViewport(req generateRequest) (*mapascii.Viewport, string, error) {
+	raw := strings.TrimSpace(req.Continent)
+	if raw == "" || strings.EqualFold(raw, "world") {
+		return nil, "", nil
+	}
+
+	continent, err := mapascii.ParseContinent(raw)
+	if err != nil {
+		return nil, "", err
+	}
+
+	viewport, err := continent.Viewport()
+	if err != nil {
+		return nil, "", err
+	}
+
+	return &viewport, string(continent), nil
 }
 
 func requestMarkerToModel(req generateRequest) (*mapascii.Marker, error) {
@@ -351,6 +411,7 @@ func decodeGenerateRequest(w http.ResponseWriter, r *http.Request, maxBodyBytes 
 	req.Color.MapColor = strings.ToLower(strings.TrimSpace(req.Color.MapColor))
 	req.Color.FrameColor = strings.ToLower(strings.TrimSpace(req.Color.FrameColor))
 	req.Color.MarkerColor = strings.ToLower(strings.TrimSpace(req.Color.MarkerColor))
+	req.Continent = strings.ToLower(strings.TrimSpace(req.Continent))
 
 	return req, nil
 }
@@ -362,6 +423,7 @@ func defaultGenerateRequest() generateRequest {
 	req.CharAspect = 2.0
 	req.Margin = 2
 	req.Frame = true
+	req.Continent = ""
 
 	req.Marker.Enabled = false
 	req.Marker.Center = "O"
