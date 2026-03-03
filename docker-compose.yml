@@ -1,5 +1,6 @@
 services:
   api:
+    container_name: ascii-map-gen-api
     build:
       context: .
       dockerfile: api/Dockerfile
@@ -17,6 +18,7 @@ services:
       args:
         PUBLIC_UMAMI_WEBSITE_ID: ${PUBLIC_UMAMI_WEBSITE_ID:-}
         PUBLIC_UMAMI_HOST_URL: ${PUBLIC_UMAMI_HOST_URL:-https://kws.kivayan.com}
+    container_name: ascii-map-gen-web
     depends_on:
       - api
     labels:
