@@ -8,6 +8,7 @@ services:
       API_MAX_WIDTH: "240"
       API_RATE_LIMIT: "20"
       API_RATE_WINDOW: "1m"
+    restart: unless-stopped
     expose:
       - "8081"
 
@@ -27,6 +28,7 @@ services:
       - traefik.http.routers.ascii-map.rule=Host(`ascii-map.kivayan.com`)
       - traefik.http.routers.ascii-map.entrypoints=web
       - traefik.http.services.ascii-map.loadbalancer.server.port=80
+    restart: unless-stopped
     networks:
       - default
       - cloudflared_network
