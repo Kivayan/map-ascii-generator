@@ -26,6 +26,7 @@ const colorOptions = [
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <title>ASCII World Map Generator</title>
     {umamiWebsiteId && (
       <script
@@ -191,6 +192,10 @@ const colorOptions = [
         min-width: 120px;
       }
 
+      .actions .export {
+        background: linear-gradient(140deg, rgba(110, 217, 222, 0.28), rgba(118, 169, 250, 0.22));
+      }
+
       button {
         border: 0;
         border-radius: 10px;
@@ -212,10 +217,11 @@ const colorOptions = [
       }
 
       .status {
-        margin-top: 0.75rem;
         min-height: 1.2rem;
         font-size: 0.9rem;
         color: var(--muted);
+        margin-left: auto;
+        text-align: right;
       }
 
       .status.error {
@@ -234,6 +240,17 @@ const colorOptions = [
         gap: 0.8rem;
         padding: 0.95rem 1rem;
         border-bottom: 1px solid rgba(133, 168, 201, 0.22);
+      }
+
+      .result-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+
+      .result-actions button {
+        min-width: 0;
+        white-space: nowrap;
       }
 
       .view-toggle {
@@ -420,22 +437,25 @@ const colorOptions = [
 
           <div class="actions">
             <button class="generate" id="generate" type="submit">Generate</button>
-            <button id="copy" type="button">Copy</button>
-            <button id="download" type="button">Download</button>
           </div>
         </form>
 
-        <div id="status" class="status"></div>
       </section>
 
       <section class="panel result">
         <header class="result-header">
           <div class="view-toggle">
-            <button id="show-plain" type="button">Plain</button>
             <button id="show-ansi" type="button" class="active">ANSI</button>
+            <button id="show-plain" type="button">Plain</button>
+          </div>
+          <div class="result-actions">
+            <button id="copy" type="button">Copy Text</button>
+            <button id="copy-snippet" class="export" type="button">Copy Snippet</button>
+            <button id="download-png" class="export" type="button">Export PNG</button>
           </div>
           <div id="meta" class="meta">Generating initial map...</div>
           <div id="dirty" class="dirty">Unsaved input changes</div>
+          <div id="status" class="status"></div>
         </header>
         <div class="output-wrap">
           <pre id="output">Generating initial map...</pre>
@@ -454,7 +474,8 @@ const colorOptions = [
       const showPlainButton = document.getElementById("show-plain");
       const showANSIButton = document.getElementById("show-ansi");
       const copyButton = document.getElementById("copy");
-      const downloadButton = document.getElementById("download");
+      const copySnippetButton = document.getElementById("copy-snippet");
+      const downloadPNGButton = document.getElementById("download-png");
       const continentSelect = document.getElementById("continent");
 
       const fallbackContinents = [
@@ -489,6 +510,14 @@ const colorOptions = [
       let currentView = "ansi";
       let currentResult = null;
       let isDirty = false;
+
+      function getActiveSource() {
+        if (!currentResult) {
+          return "";
+        }
+
+        return currentView === "ansi" ? currentResult.ansi : currentResult.plain;
+      }
 
       function escapeHTML(value) {
         return value
@@ -550,6 +579,26 @@ const colorOptions = [
       function updateStatus(text, isError = false) {
         statusEl.textContent = text;
         statusEl.classList.toggle("error", isError);
+      }
+
+      function getPlainExportValue() {
+        if (!currentResult) {
+          return "";
+        }
+
+        return currentResult.plain;
+      }
+
+      function getTextExportValue() {
+        if (!currentResult) {
+          return "";
+        }
+
+        return currentView === "ansi" ? currentResult.ansi : currentResult.plain;
+      }
+
+      function getMarkdownSnippet() {
+        return `\`\`\`txt\n${getPlainExportValue()}\n\`\`\``;
       }
 
       function setView(view) {
@@ -693,25 +742,13 @@ const colorOptions = [
         }
       }
 
-      function getCurrentExportValue() {
-        if (!currentResult) {
-          return "";
-        }
-
-        if (currentView === "ansi") {
-          return outputEl.textContent || currentResult.plain;
-        }
-
-        return currentResult.plain;
-      }
-
       async function copyCurrentView() {
         if (!currentResult) {
           updateStatus("Generate a map first.", true);
           return;
         }
 
-        const value = getCurrentExportValue();
+        const value = getTextExportValue();
         try {
           await navigator.clipboard.writeText(value);
           updateStatus("Output copied.");
@@ -720,25 +757,147 @@ const colorOptions = [
         }
       }
 
-      function downloadCurrentView() {
+      async function copyMarkdownSnippet() {
         if (!currentResult) {
           updateStatus("Generate a map first.", true);
           return;
         }
 
-        const value = getCurrentExportValue();
-        const blob = new Blob([value], { type: "text/plain;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
+        try {
+          await navigator.clipboard.writeText(getMarkdownSnippet());
+          updateStatus("Markdown snippet copied.");
+        } catch {
+          updateStatus("Clipboard write failed.", true);
+        }
+      }
 
+      function colorValue(token) {
+        if (!token) {
+          return null;
+        }
+
+        return getComputedStyle(document.documentElement).getPropertyValue(token.slice(4, -1)).trim() || null;
+      }
+
+      function ansiToSegments(source) {
+        const ansiRE = /\x1b\[([0-9;]*)m/g;
+        const lines = [[]];
+        let cursor = 0;
+        let currentColor = null;
+        let match;
+
+        function pushText(text) {
+          const parts = text.split("\n");
+          for (let index = 0; index < parts.length; index += 1) {
+            if (parts[index]) {
+              lines[lines.length - 1].push({ text: parts[index], color: currentColor });
+            }
+            if (index < parts.length - 1) {
+              lines.push([]);
+            }
+          }
+        }
+
+        while ((match = ansiRE.exec(source)) !== null) {
+          pushText(source.slice(cursor, match.index));
+          cursor = ansiRE.lastIndex;
+
+          const codes = match[1]
+            .split(";")
+            .filter(Boolean)
+            .map((value) => Number(value));
+
+          if (codes.length === 0 || codes.includes(0)) {
+            currentColor = null;
+            continue;
+          }
+
+          for (const code of codes) {
+            const nextColor = colorValue(ansiCodeToColor[code]);
+            if (nextColor) {
+              currentColor = nextColor;
+            }
+          }
+        }
+
+        pushText(source.slice(cursor));
+        return lines;
+      }
+
+      async function exportPNG() {
+        if (!currentResult) {
+          updateStatus("Generate a map first.", true);
+          return;
+        }
+
+        if (document.fonts?.ready) {
+          await document.fonts.ready;
+        }
+
+        const styles = getComputedStyle(outputEl);
+        const fontSize = Number.parseFloat(styles.fontSize) || 13.12;
+        const lineHeight = fontSize;
+        const fontFamily = styles.fontFamily || '"JetBrains Mono", monospace';
+        const font = `${fontSize}px ${fontFamily}`;
+        const paddingX = 16;
+        const paddingY = 16;
+        const source = getActiveSource();
+        const lines = currentView === "ansi"
+          ? ansiToSegments(source)
+          : source.split("\n").map((text) => [{ text, color: null }]);
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          updateStatus("Canvas export is not available.", true);
+          return;
+        }
+
+        ctx.font = font;
+
+        const lineTexts = lines.map((line) => line.map((segment) => segment.text).join(""));
+        const maxWidth = Math.max(1, ...lineTexts.map((line) => ctx.measureText(line || " ").width));
+        const contentHeight = Math.max(1, lines.length) * lineHeight;
+
+        canvas.width = Math.ceil(maxWidth + paddingX * 2);
+        canvas.height = Math.ceil(contentHeight + paddingY * 2);
+
+        ctx.fillStyle = "#050a12";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.font = font;
+        ctx.textBaseline = "top";
+
+        lines.forEach((line, lineIndex) => {
+          let x = paddingX;
+          const y = paddingY + lineIndex * lineHeight;
+
+          if (line.length === 0) {
+            return;
+          }
+
+          line.forEach((segment) => {
+            ctx.fillStyle = segment.color || "#eaf5ff";
+            ctx.fillText(segment.text, x, y);
+            x += ctx.measureText(segment.text).width;
+          });
+        });
+
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        if (!blob) {
+          updateStatus("PNG export failed.", true);
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = url;
-        anchor.download = "map.txt";
+        anchor.download = "map.png";
         document.body.append(anchor);
         anchor.click();
         anchor.remove();
-
         URL.revokeObjectURL(url);
-        updateStatus("Output downloaded.");
+
+        updateStatus("PNG exported.");
       }
 
       form.addEventListener("submit", (event) => {
@@ -753,7 +912,8 @@ const colorOptions = [
       showPlainButton.addEventListener("click", () => setView("plain"));
       showANSIButton.addEventListener("click", () => setView("ansi"));
       copyButton.addEventListener("click", copyCurrentView);
-      downloadButton.addEventListener("click", downloadCurrentView);
+      copySnippetButton.addEventListener("click", copyMarkdownSnippet);
+      downloadPNGButton.addEventListener("click", exportPNG);
 
       async function initialize() {
         await loadContinentOptions();

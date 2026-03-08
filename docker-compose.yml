@@ -7,6 +7,8 @@ services:
       API_MAX_WIDTH: "240"
       API_RATE_LIMIT: "20"
       API_RATE_WINDOW: "1m"
+    ports:
+      - "8081:8081"
     expose:
       - "8081"
 
@@ -19,6 +21,8 @@ services:
         PUBLIC_UMAMI_HOST_URL: ${PUBLIC_UMAMI_HOST_URL:-https://kws.kivayan.com}
     depends_on:
       - api
+    ports:
+      - "8080:80"
     labels:
       - traefik.enable=true
       - traefik.docker.network=cloudflared_network
