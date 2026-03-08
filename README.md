@@ -41,6 +41,8 @@ docker compose up --build
 
 Open `http://localhost:8080`.
 
+The API is also exposed directly on `http://localhost:8081` for local testing.
+
 ## Umami analytics
 
 This repo supports Umami tracking via public env vars (Astro build-time):
