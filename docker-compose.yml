@@ -11,6 +11,8 @@ services:
     restart: unless-stopped
     expose:
       - "8081"
+    ports:
+      - "18081:8081"
 
   web:
     build:
@@ -23,7 +25,7 @@ services:
     depends_on:
       - api
     ports:
-      - "8080:80"
+      - "18080:80"
     labels:
       - traefik.enable=true
       - traefik.docker.network=cloudflared_network

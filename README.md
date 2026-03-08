@@ -43,6 +43,11 @@ Open `http://localhost:8080`.
 
 The API is also exposed directly on `http://localhost:8081` for local testing.
 
+On the production server, this stack also exposes non-conflicting debug ports so it can run behind Traefik without taking over shared host ports:
+
+- `http://localhost:18080`
+- `http://localhost:18081/api/healthz`
+
 ## Umami analytics
 
 This repo supports Umami tracking via public env vars (Astro build-time):
